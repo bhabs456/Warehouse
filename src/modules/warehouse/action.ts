@@ -44,3 +44,17 @@ export async function updateOrderStatus(documentId: string, newStatus: string) {
     return { success: false, error: error.message || 'Failed to update status.' }
   }
 }
+
+/**
+ * 3. Fetch All Orders
+ */
+export async function getAllOrders() {
+  try {
+    const query = `*[_type == "order"] | order(createdAt desc)`
+    const data = await serverClient.fetch(query)
+    return { success: true, data }
+  } catch (error: any) {
+    console.error('Fetch all error:', error)
+    return { success: false, error: error.message || 'Failed to fetch all orders.' }
+  }
+}
