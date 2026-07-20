@@ -34,9 +34,84 @@ export default function WarehouseDashboard() {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>("confirmed");
   const [updating, setUpdating] = useState<boolean>(false);
 
+  // Lock and session states
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [pinDigits, setPinDigits] = useState<string[]>(Array(6).fill(""));
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(600);
+
   useEffect(() => {
     loadAllOrders();
   }, []);
+
+  // PIN lock inactivity timer and events
+  useEffect(() => {
+    if (isLocked) return;
+
+    const resetTimer = () => {
+      setSecondsRemaining(600);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    const interval = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          setIsLocked(true);
+          return 600;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+      clearInterval(interval);
+    };
+  }, [isLocked]);
+
+  // Auto-verify when 6 digits are filled
+  useEffect(() => {
+    const enteredPin = pinDigits.join("");
+    if (enteredPin.length === 6) {
+      if (enteredPin === "231245") {
+        setIsLocked(false);
+        setPinError(null);
+        setPinDigits(Array(6).fill(""));
+        setSecondsRemaining(600);
+      } else {
+        setPinError("Incorrect PIN. Please try again.");
+        setPinDigits(Array(6).fill(""));
+        setTimeout(() => {
+          document.getElementById("pin-0")?.focus();
+        }, 10);
+      }
+    }
+  }, [pinDigits]);
+
+  const handlePinChange = (value: string, index: number) => {
+    const newDigits = [...pinDigits];
+    newDigits[index] = value.replace(/[^0-9]/g, "").slice(-1);
+    setPinDigits(newDigits);
+    setPinError(null);
+
+    if (newDigits[index] && index < 5) {
+      const nextInput = document.getElementById(`pin-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handlePinKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === "Backspace" && !pinDigits[index] && index > 0) {
+      const prevInput = document.getElementById(`pin-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
 
   const loadAllOrders = async () => {
     setLoading(true);
@@ -48,11 +123,7 @@ export default function WarehouseDashboard() {
       }
       const fetchedOrders = result.data || [];
       setOrders(fetchedOrders);
-
-      // Auto-select the first order if available and none selected yet
-      if (fetchedOrders.length > 0 && !selectedOrderRaw) {
-        selectOrder(fetchedOrders[0]);
-      }
+      // Removed auto-select code to make dashboard open blank on load
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load orders.");
     } finally {
@@ -246,6 +317,41 @@ export default function WarehouseDashboard() {
     );
   };
 
+  // Lock Overlay UI
+  if (isLocked) {
+    return (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl max-w-sm w-full text-center">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Enter PIN</h2>
+          
+          <div className="flex gap-2 mb-4 justify-center">
+            {pinDigits.map((digit, idx) => (
+              <input
+                key={idx}
+                id={`pin-${idx}`}
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handlePinChange(e.target.value, idx)}
+                onKeyDown={(e) => handlePinKeyDown(e, idx)}
+                autoFocus={idx === 0}
+                className="w-10 h-12 border border-slate-300 rounded-lg text-center text-lg font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-mono"
+              />
+            ))}
+          </div>
+
+          {pinError && (
+            <p className="text-xs text-rose-600 mb-4 font-semibold">
+              {pinError}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 font-sans antialiased overflow-hidden w-full">
       {/* Header */}
@@ -261,14 +367,16 @@ export default function WarehouseDashboard() {
             <p className="text-xs text-slate-400">Manage orders, packaging & tracking dispatch</p>
           </div>
         </div>
-        <button
-          onClick={loadAllOrders}
-          disabled={loading}
-          className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          <span>Sync</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={loadAllOrders}
+            disabled={loading}
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            <span>Sync</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -430,7 +538,7 @@ export default function WarehouseDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 {/* Product Manifest Checklist */}
                 <div className="lg:col-span-2 flex flex-col space-y-3">
-                  <h3 className="text-xs font-extrabold text-slate-450 uppercase tracking-wider">
+                  <h3 className="text-xs font-extrabold text-slate-455 uppercase tracking-wider">
                     Manifest Items Checklist
                   </h3>
                   {orderData.items.map((item) => (
