@@ -211,10 +211,11 @@ export default function WarehouseDashboard() {
     const discountVal = typeof order.discountAmount === "number" ? order.discountAmount : 0;
     const shippingCostVal = typeof order.shippingCost === "number" ? order.shippingCost : 0;
     const codFeeVal = typeof order.codFee === "number" ? order.codFee : 0;
+    const gstFeeVal = typeof order.gstFee === "number" ? order.gstFee : 0;
 
     const subtotalVal = typeof order.originalPrice === "number"
       ? order.originalPrice
-      : Math.max(0, totalVal + discountVal - shippingCostVal - codFeeVal);
+      : Math.max(0, totalVal + discountVal - shippingCostVal - codFeeVal - gstFeeVal);
 
     setOrderData({
       orderNumber: order.orderId || order._id,
@@ -231,6 +232,7 @@ export default function WarehouseDashboard() {
         subtotal: subtotalVal,
         delivery: shippingCostVal,
         codFee: codFeeVal,
+        gstFee: gstFeeVal,
         coupon: order.appliedCoupon ? { code: order.appliedCoupon, discount: discountVal } : undefined,
         total: totalVal,
       },
@@ -579,30 +581,47 @@ export default function WarehouseDashboard() {
                       Financial overview
                     </h4>
                     <div className="space-y-2 text-xs">
+                      {/* Subtotal */}
                       <div className="flex justify-between text-slate-500">
                         <span>Subtotal</span>
                         <span className="font-semibold text-slate-900">₹{orderData.summary.subtotal.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between text-slate-500">
-                        <span>Delivery</span>
-                        {orderData.summary.delivery === 0 ? (
-                          <span className="font-bold text-green-600 uppercase text-[10px]">Free</span>
-                        ) : (
-                          <span className="font-semibold text-slate-900">₹{orderData.summary.delivery.toFixed(2)}</span>
-                        )}
-                      </div>
+                      
+                      {/* GST */}
+                      {orderData.summary.gstFee !== undefined && orderData.summary.gstFee > 0 && (
+                        <div className="flex justify-between text-slate-500">
+                          <span>GST</span>
+                          <span className="font-semibold text-slate-900">₹{orderData.summary.gstFee.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {/* COD Handling Fee (when selected/selected payment method) */}
                       {orderData.summary.codFee !== undefined && orderData.summary.codFee > 0 && (
                         <div className="flex justify-between text-slate-500">
                           <span>COD Handling Fee</span>
                           <span className="font-semibold text-slate-900">₹{orderData.summary.codFee.toFixed(2)}</span>
                         </div>
                       )}
+
+                      {/* Delivery/Shipping Cost */}
+                      <div className="flex justify-between text-slate-500">
+                        <span>Shipping Cost</span>
+                        {orderData.summary.delivery === 0 ? (
+                          <span className="font-bold text-green-600 uppercase text-[10px]">Free</span>
+                        ) : (
+                          <span className="font-semibold text-slate-900">₹{orderData.summary.delivery.toFixed(2)}</span>
+                        )}
+                      </div>
+
+                      {/* Coupon / Discount */}
                       {orderData.summary.coupon && (
                         <div className="flex justify-between text-green-600 font-medium">
                           <span>Coupon ({orderData.summary.coupon.code})</span>
                           <span>- ₹{orderData.summary.coupon.discount.toFixed(2)}</span>
                         </div>
                       )}
+
+                      {/* Total Bill */}
                       <div className="border-t border-dashed border-slate-200 pt-3 mt-2 flex justify-between items-baseline">
                         <span className="text-sm font-bold text-slate-950">Total Bill</span>
                         <span className="text-lg font-black text-slate-900">₹{orderData.summary.total.toFixed(2)}</span>

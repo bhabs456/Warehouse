@@ -20,6 +20,7 @@ export interface OrderSummary {
   subtotal: number;
   delivery: number;
   codFee?: number;
+  gstFee?: number;
   coupon?: {
     code: string;
     discount: number;
